@@ -15,6 +15,7 @@ from app.io.video_source import LocalWebcamSource
 from app.ui.alarm_overlay import AlarmOverlay
 from app.ui.home_page import HomePage
 from app.ui.session_page import SessionPage
+from app.ui.stats_page import StatsPage
 from app.ui.styles import app_stylesheet
 from daydream_vision import VisionAnalyzer
 from daydream_store import SqliteSessionRecorder
@@ -152,13 +153,17 @@ class AppWindow(QMainWindow):
 
         self._home = HomePage()
         self._session = SessionPage()
+        self._stats = StatsPage()
         self._stack.addWidget(self._home)
         self._stack.addWidget(self._session)
+        self._stack.addWidget(self._stats)
 
         self._overlay = AlarmOverlay()
 
         self._home.start_requested.connect(self._start_session)
+        self._home.stats_requested.connect(self._show_stats)
         self._session.exit_requested.connect(self._stop_and_back_home)
+        self._stats.back_requested.connect(self._back_home)
 
         self._worker_thread: QThread | None = None
         self._worker: _Worker | None = None
@@ -237,6 +242,16 @@ class AppWindow(QMainWindow):
         self._worker = None
         self._config = None
         self._started_at = None
+        self._stack.setCurrentWidget(self._home)
+
+    def _show_stats(self) -> None:
+        self._stack.setCurrentWidget(self._stats)
+        try:
+            self._stats.refresh()
+        except Exception:
+            pass
+
+    def _back_home(self) -> None:
         self._stack.setCurrentWidget(self._home)
 
 

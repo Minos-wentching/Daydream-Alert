@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +25,7 @@ class VisionAnalyzer:
 
         self._face_mesh = None
         self._yolo = None
+        self._yolo_device = "cpu"
 
         if self._enable_face_pose:
             try:
@@ -47,8 +49,21 @@ class VisionAnalyzer:
                     from ultralytics import YOLO  # type: ignore
 
                     self._yolo = YOLO(str(weights))
+                    self._yolo_device = self._detect_yolo_device()
             except Exception:
                 self._yolo = None
+                self._yolo_device = "cpu"
+
+    def _detect_yolo_device(self) -> str:
+        override = (os.environ.get("DAYDREAM_YOLO_DEVICE") or "").strip()
+        if override:
+            return override
+        try:
+            import torch  # type: ignore
+
+            return "cuda" if bool(torch.cuda.is_available()) else "cpu"
+        except Exception:
+            return "cpu"
 
     def analyze(self, frame_bgr) -> VisionSignals:
         face_present = False
@@ -80,7 +95,7 @@ class VisionAnalyzer:
                     imgsz=640,
                     conf=0.35,
                     verbose=False,
-                    device="cpu",
+                    device=self._yolo_device,
                 )
                 if results:
                     r0 = results[0]
@@ -94,4 +109,3 @@ class VisionAnalyzer:
                 pass
 
         return VisionSignals(face_present=face_present, looking_down=looking_down, phone_present=phone_present)
-
