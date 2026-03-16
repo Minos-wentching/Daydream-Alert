@@ -61,15 +61,6 @@ python -m pytest -q
 - 手机检测（YOLOv8）默认只在项目根目录存在 `yolov8n.pt` 时启用；否则会自动跳过，避免联网下载权重。
 - 如果你觉得电脑性能吃紧，可以在首页关闭“YOLO 手机检测”，只保留窗口白名单 + Face 粗判。
 
-## 数据存放（为什么需要“SQL 数据库”）
-
-如果你后续想做这些事情：
-- 看每天/每周分神总时长趋势  
-- 对比不同任务类型的专注度  
-- 统计“最容易分神的应用/窗口标题”  
-
-那用 **SQLite（轻量 SQL 数据库）**会比只写日志文件更方便：它是一个本地单文件数据库，不需要安装服务器。
-
 本项目 v1 会把结构化数据写到：
 - `data/daydream_focus.sqlite3`（自动创建，已在 `.gitignore` 忽略，不会提交到仓库）
 
@@ -84,26 +75,11 @@ python -m pytest -q
 - `sessions`：一次任务会话（任务名、开始/结束时间、当次配置 JSON）
 - `segments`：会话内的状态片段（work/distracted/rest，每段起止时间、原因、前台窗口信息）
 
-### 怎么打开查看（推荐图形化）
-
-1) 下载并安装 “DB Browser for SQLite”
-2) 打开 `data/daydream_focus.sqlite3`
-3) 直接浏览 `sessions` / `segments` 表或导出 CSV
-
-## 数据采集 / 标注 / 模型训练（你后续要做的）
-
-YOLOv8 标注与训练的“从下载安装到训练命令”的流程，已整理在：
-- `docs/yolo8_dataset_tutorial.md`
-
-训练完成后如何接入：
-- 把你训练好的 `best.pt` 重命名为 `yolov8n.pt` 放到项目根目录（或按你自己的路径改代码）
-- 再打开应用启用“手机检测（YOLOv8）”，就会自动加载该权重
-
 ## 为未来“监控/RTSP 接入”预留的接口
 
 当前版本使用本机摄像头；后续要接入监控（例如 RTSP）时，会沿用现有的 `VideoSource` 抽象（在 `app/io/video_source.py`），再实现 `RtspStreamSource(url)` 即可把数据源替换掉（v1 未实现流接入，仅保留扩展点）。
 
-## Roadmap（建议的下一步）
+## Roadmap（更新）
 
 - 增加“专注日报/周报”统计页（从 SQLite 拉取数据）
 - 把“白名单配置”做成可保存模板（任务类型一键套用）
