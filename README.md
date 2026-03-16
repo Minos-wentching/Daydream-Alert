@@ -1,4 +1,4 @@
-# Daydream Alert / Daydream Focus（Windows 本地桌面应用）
+# Daydream Focus（Windows 本地桌面应用）
 
 你是不是也有这种时刻：
 
