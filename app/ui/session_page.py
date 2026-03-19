@@ -54,12 +54,23 @@ class SessionPage(QWidget):
         card_layout.setHorizontalSpacing(16)
         card_layout.setVerticalSpacing(10)
 
+        # Base font is 14px; increase by +8px for all texts inside the card.
+        big = 'font-size: 22px;'
+
         self.state_label = QLabel('状态：-')
-        self.state_label.setStyleSheet('font-size: 18px; font-weight: 700;')
+        self.state_label.setStyleSheet('font-size: 26px; font-weight: 700;')
+
         self.distracted_label = QLabel('累计分神：0s')
+        self.distracted_label.setStyleSheet(big)
+
         self.work_streak_label = QLabel('持续工作：0s')
+        self.work_streak_label.setStyleSheet(big)
+
         self.window_label = QLabel('前台窗口：-')
+        self.window_label.setStyleSheet(big)
+
         self.reasons_label = QLabel('原因：-')
+        self.reasons_label.setStyleSheet(big)
 
         left = QVBoxLayout()
         left.addWidget(self.state_label)
@@ -77,6 +88,7 @@ class SessionPage(QWidget):
         self.preview.setFixedSize(460, 300)
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview.setText('摄像头预览')
+        self.preview.setStyleSheet('font-size: 22px;')
 
         card_layout.addWidget(left_container, 0, 0, 1, 1)
         card_layout.addWidget(self.preview, 0, 1, 1, 1, alignment=Qt.AlignmentFlag.AlignRight)

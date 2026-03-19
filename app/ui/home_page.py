@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
 
 from app.core.models import TaskConfig, normalize_lines
 from app.core.whitelist_templates import WhitelistTemplateStore
-from app.io.video_source import probe_local_webcam
 
 
 def _form_label(text: str) -> QLabel:
@@ -470,31 +469,12 @@ class HomePage(QWidget):
             ok = QMessageBox.question(
                 self,
                 '摄像头权限',
-                '需要使用摄像头进行实时专注监测（不保存画面），是否允许？',
+                '需要使用摄像头进行实时专注监测（不保存画面），是否允许？\\n\\n（如摄像头被系统隐私设置禁用，将自动降级为仅窗口检测。）',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if ok != QMessageBox.StandardButton.Yes:
                 enable_camera = False
-            else:
-                available, err = probe_local_webcam(0)
-                if not available:
-                    choice = QMessageBox.question(
-                        self,
-                        '摄像头不可用',
-                        f'摄像头打开/取帧失败：{err}\n\n是否打开系统“摄像头隐私设置”？\n（也可以选择继续，以仅窗口检测模式运行）',
-                        QMessageBox.StandardButton.Yes
-                        | QMessageBox.StandardButton.No
-                        | QMessageBox.StandardButton.Cancel,
-                    )
-                    if choice == QMessageBox.StandardButton.Yes:
-                        try:
-                            os.startfile('ms-settings:privacy-webcam')
-                        except Exception:
-                            pass
-                        return
-                    if choice == QMessageBox.StandardButton.Cancel:
-                        return
-                    enable_camera = False
+            # Windows 通常不会弹系统授权框；若被系统隐私设置禁用，开始后会自动降级为仅窗口检测。
 
         if not enable_camera:
             self.enable_camera.setChecked(False)
@@ -518,3 +498,4 @@ class HomePage(QWidget):
         )
 
         self.start_requested.emit(config)
+

@@ -1,25 +1,33 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
-
-from PySide6.QtCore import QObject, QMetaObject, QThread, QTimer, Qt, Signal, Slot
-from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QStackedWidget
-
 from pathlib import Path
 
-from app.core.monitor_controller import MonitorController
+from PySide6.QtCore import QObject, QMetaObject, QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QMessageBox,
+    QStackedLayout,
+    QStackedWidget,
+    QWidget,
+)
+
 from app.core.models import TaskConfig
+from app.core.monitor_controller import MonitorController
 from app.core.session_logger import SessionLogger
 from app.io.active_window import WindowsActiveWindowProvider
 from app.io.video_source import LocalWebcamSource
 from app.ui.alarm_overlay import AlarmOverlay
-from app.ui.surrender_overlay import SurrenderOverlay
 from app.ui.home_page import HomePage
 from app.ui.session_page import SessionPage
 from app.ui.stats_page import StatsPage
 from app.ui.styles import app_stylesheet, apply_app_palette
-from daydream_vision import VisionAnalyzer
+from app.ui.success_overlay import SuccessOverlay
+from app.ui.surrender_overlay import SurrenderOverlay
 from daydream_store import SqliteSessionRecorder
+from daydream_vision import VisionAnalyzer
 
 
 def _now_local() -> datetime:
@@ -59,9 +67,12 @@ class _Worker(QObject):
             self._active_window = _NullActiveWindowProvider()
 
         enable_yolo = self._config.enable_yolo_phone and self._config.enable_camera
-        if enable_yolo and not Path("yolov8n.pt").exists():
+        if enable_yolo and not Path('yolov8n.pt').exists():
             enable_yolo = False
-            self.failed.emit("未找到 yolov8n.pt，已跳过手机检测（YOLOv8）。")
+            self.failed.emit(
+                '未找到 yolov8n.pt，已跳过手机检测（YOLOv8）。\n'
+                '你可以从 Ultralytics 官方权重下载 yolov8n.pt，并放到项目根目录。'
+            )
 
         self._vision = VisionAnalyzer(
             enable_face_pose=self._config.enable_face_pose and self._config.enable_camera,
@@ -72,13 +83,13 @@ class _Worker(QObject):
         self._logger = SessionLogger(self._config.task_name, started_at=started_at)
         try:
             self._db = SqliteSessionRecorder(
-                db_path=Path("data") / "daydream_focus.sqlite3",
+                db_path=Path('data') / 'daydream_focus.sqlite3',
                 config=self._config,
                 started_at=started_at,
             )
         except Exception as exc:
             self._db = None
-            self.failed.emit(f"SQLite 记录初始化失败：{exc}")
+            self.failed.emit(f'SQLite 记录初始化失败：{exc}')
 
         effective_config = self._config
 
@@ -88,9 +99,9 @@ class _Worker(QObject):
                 self._video.open()
             except Exception as exc:
                 self._video = None
-                self.failed.emit(f"摄像头打开失败：{exc}（已切换为仅窗口检测模式）")
+                self.failed.emit(f'摄像头打开失败：{exc}（已切换为仅窗口检测模式）')
                 effective_config = self._config.model_copy(
-                    update={"enable_camera": False, "enable_yolo_phone": False, "enable_face_pose": False}
+                    update={'enable_camera': False, 'enable_yolo_phone': False, 'enable_face_pose': False}
                 )
 
         self._config = effective_config
@@ -108,6 +119,8 @@ class _Worker(QObject):
             on_update=_on_update,
         )
 
+        # Make the UI update immediately.
+        self._on_tick()
         self._timer.start()
 
     @Slot()
@@ -140,24 +153,26 @@ class _Worker(QObject):
                     pass
 
     def _on_tick(self) -> None:
-        frame = None
-        if self._video is not None:
-            frame = self._video.read()
+        try:
+            frame = None
+            if self._video is not None:
+                frame = self._video.read()
 
-        if self._monitor is None:
-            return
-        update = self._monitor.tick(frame_bgr=frame)
-        self.ticked.emit(update, frame)
+            if self._monitor is None:
+                return
+            update = self._monitor.tick(frame_bgr=frame)
+            self.ticked.emit(update, frame)
+        except Exception as exc:
+            self.failed.emit(f'监测循环异常：{exc}')
 
 
 class AppWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Daydream Focus")
+        self.setWindowTitle('Daydream Focus')
         self.setMinimumSize(980, 640)
 
         self._stack = QStackedWidget()
-        self.setCentralWidget(self._stack)
 
         self._home = HomePage()
         self._session = SessionPage()
@@ -166,9 +181,21 @@ class AppWindow(QMainWindow):
         self._stack.addWidget(self._session)
         self._stack.addWidget(self._stats)
 
-        self._overlay = AlarmOverlay()
+        self._root = QWidget()
+        self._root_layout = QStackedLayout(self._root)
+        self._root_layout.setStackingMode(QStackedLayout.StackingMode.StackAll)
+        self._root_layout.setContentsMargins(0, 0, 0, 0)
+        self._root_layout.addWidget(self._stack)
 
-        self._surrender = SurrenderOverlay()
+        # In-window overlays (cover current UI; no new window).
+        self._overlay = AlarmOverlay(self._root)
+        self._surrender = SurrenderOverlay(self._root)
+        self._success = SuccessOverlay(self._root)
+        self._root_layout.addWidget(self._overlay)
+        self._root_layout.addWidget(self._surrender)
+        self._root_layout.addWidget(self._success)
+
+        self.setCentralWidget(self._root)
 
         self._home.start_requested.connect(self._start_session)
         self._home.stats_requested.connect(self._show_stats)
@@ -192,8 +219,11 @@ class AppWindow(QMainWindow):
         self._session.set_config(config)
         self._stack.setCurrentWidget(self._session)
         self._overlay.hide_overlay()
+        self._surrender.hide_overlay()
+        self._success.hide_overlay()
 
         self._schedule_timer.start()
+        self._schedule_tick()
 
     def _schedule_tick(self) -> None:
         if self._config is None:
@@ -201,7 +231,7 @@ class AppWindow(QMainWindow):
 
         now = _now_local()
         if now >= self._config.end_at:
-            self._stop_and_back_home()
+            self._complete_and_back_home()
             return
 
         if now < self._config.start_at:
@@ -223,6 +253,20 @@ class AppWindow(QMainWindow):
 
     def _on_worker_failed(self, message: str) -> None:
         self.statusBar().showMessage(message, 8000)
+
+        msg_l = message.lower()
+        if '摄像头打开失败' in message or 'webcam' in msg_l or 'camera' in msg_l:
+            box = QMessageBox(self)
+            box.setWindowTitle('摄像头不可用')
+            box.setText(message + '\n\n是否打开 Windows 摄像头隐私设置？')
+            open_btn = box.addButton('打开设置', QMessageBox.ButtonRole.AcceptRole)
+            box.addButton('继续', QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+            if box.clickedButton() == open_btn:
+                try:
+                    os.startfile('ms-settings:privacy-webcam')
+                except Exception:
+                    pass
 
     def _on_worker_ticked(self, update, frame_bgr) -> None:
         self._session.on_state_update(update)
@@ -249,10 +293,8 @@ class AppWindow(QMainWindow):
     def _stop_session(self) -> None:
         self._schedule_timer.stop()
         self._overlay.hide_overlay()
-        try:
-            self._surrender.hide_overlay()
-        except Exception:
-            pass
+        self._surrender.hide_overlay()
+        self._success.hide_overlay()
 
         if self._worker is not None:
             try:
@@ -276,8 +318,11 @@ class AppWindow(QMainWindow):
     def _back_home_after_surrender(self) -> None:
         self._stack.setCurrentWidget(self._home)
 
-    def _stop_and_back_home(self) -> None:
+    def _complete_and_back_home(self) -> None:
         self._stop_session()
+        self._success.show_for(5000, on_finished=self._back_home_after_success)
+
+    def _back_home_after_success(self) -> None:
         self._stack.setCurrentWidget(self._home)
 
     def _show_stats(self) -> None:
@@ -298,6 +343,3 @@ def run_app() -> None:
     win = AppWindow()
     win.show()
     app.exec()
-
-
-
