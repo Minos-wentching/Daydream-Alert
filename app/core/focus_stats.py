@@ -81,8 +81,7 @@ def load_period_stats(db_path: Path, start_at: datetime, end_at: datetime) -> Pe
               COALESCE(g.process_name, '')
             FROM segments g
             JOIN sessions s ON s.id = g.session_id
-            WHERE s.ended_at IS NOT NULL
-              AND g.start_at < ?
+            WHERE g.start_at < ?
               AND g.end_at > ?
             ORDER BY s.id ASC, g.start_at ASC
             ''',
@@ -120,7 +119,7 @@ def load_period_stats(db_path: Path, start_at: datetime, end_at: datetime) -> Pe
                         'session_id': sid,
                         'task_name': str(task_name or ''),
                         'started_at': _parse_dt(session_started_at),
-                        'ended_at': _parse_dt(session_ended_at),
+                        'ended_at': (_parse_dt(session_ended_at) if session_ended_at else seg_end),
                         'work_s': 0.0,
                         'distracted_s': 0.0,
                         'rest_s': 0.0,
@@ -128,6 +127,9 @@ def load_period_stats(db_path: Path, start_at: datetime, end_at: datetime) -> Pe
                 except Exception:
                     continue
                 per_session[sid] = info
+
+            if session_ended_at is None and seg_end > info['ended_at']:
+                info['ended_at'] = seg_end
 
             if state == 'work':
                 info['work_s'] += dur_s

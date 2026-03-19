@@ -290,6 +290,7 @@ class AppWindow(QMainWindow):
         if box.clickedButton() == yes_btn:
             self._surrender_and_back_home()
 
+
     def _stop_session(self) -> None:
         self._schedule_timer.stop()
         self._overlay.hide_overlay()
@@ -298,13 +299,21 @@ class AppWindow(QMainWindow):
 
         if self._worker is not None:
             try:
-                QMetaObject.invokeMethod(self._worker, 'stop', Qt.ConnectionType.QueuedConnection)
+                QMetaObject.invokeMethod(
+                    self._worker,
+                    'stop',
+                    Qt.ConnectionType.BlockingQueuedConnection,
+                )
             except Exception:
-                pass
+                try:
+                    self._worker.stop()
+                except Exception:
+                    pass
 
         if self._worker_thread is not None:
             self._worker_thread.quit()
-            self._worker_thread.wait(2000)
+            if not self._worker_thread.wait(3000):
+                self.statusBar().showMessage('停止监测线程超时：统计可能不完整。', 8000)
 
         self._worker_thread = None
         self._worker = None
