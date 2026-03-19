@@ -476,6 +476,28 @@ class HomePage(QWidget):
                 enable_camera = False
             # Windows 通常不会弹系统授权框；若被系统隐私设置禁用，开始后会自动降级为仅窗口检测。
 
+
+
+        # Prefer GPU for YOLO if available (optional).
+        # Ultralytics uses PyTorch; CUDA is only available when a CUDA-enabled torch build is installed.
+        if enable_camera and bool(self.enable_yolo.isChecked()) and not os.environ.get('DAYDREAM_YOLO_DEVICE'):
+            try:
+                import torch  # type: ignore
+
+                if bool(torch.cuda.is_available()):
+                    box = QMessageBox(self)
+                    box.setWindowTitle('YOLO 运行设备')
+                    box.setText('检测到可用 GPU（CUDA）。是否使用 GPU 运行 YOLOv8 手机检测？
+
+（推荐使用 GPU；若后续报 CUDA 错误可选 CPU。）')
+                    yes_btn = box.addButton('使用 GPU', QMessageBox.ButtonRole.AcceptRole)
+                    no_btn = box.addButton('使用 CPU', QMessageBox.ButtonRole.RejectRole)
+                    box.setDefaultButton(yes_btn)
+                    box.exec()
+                    os.environ['DAYDREAM_YOLO_DEVICE'] = 'cuda' if box.clickedButton() == yes_btn else 'cpu'
+            except Exception:
+                pass
+
         if not enable_camera:
             self.enable_camera.setChecked(False)
             self.enable_face.setChecked(False)

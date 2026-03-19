@@ -120,16 +120,31 @@ class VisionAnalyzer:
                         verbose=False,
                         device=self._yolo_device,
                     )
-                    if results:
-                        r0 = results[0]
-                        if r0.boxes is not None and len(r0.boxes) > 0:
-                            names = getattr(r0, 'names', None) or {}
-                            for cls_id in r0.boxes.cls.tolist():
-                                if names.get(int(cls_id), '') == 'cell phone':
-                                    self._last_phone_ts = now_s
-                                    break
                 except Exception:
-                    pass
+                    # Common when a machine has a GPU but the CUDA runtime / torch build is mismatched.
+                    if str(self._yolo_device).lower().startswith('cuda'):
+                        self._yolo_device = 'cpu'
+                        try:
+                            results = self._yolo.predict(
+                                source=frame_bgr,
+                                imgsz=480,
+                                conf=0.35,
+                                verbose=False,
+                                device=self._yolo_device,
+                            )
+                        except Exception:
+                            results = []
+                    else:
+                        results = []
+
+                if results:
+                    r0 = results[0]
+                    if r0.boxes is not None and len(r0.boxes) > 0:
+                        names = getattr(r0, 'names', None) or {}
+                        for cls_id in r0.boxes.cls.tolist():
+                            if names.get(int(cls_id), '') == 'cell phone':
+                                self._last_phone_ts = now_s
+                                break
 
             phone_present = (now_s - self._last_phone_ts) <= self._yolo_hold_s
 
