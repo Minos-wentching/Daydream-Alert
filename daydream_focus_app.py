@@ -16,7 +16,7 @@ from app.ui.alarm_overlay import AlarmOverlay
 from app.ui.home_page import HomePage
 from app.ui.session_page import SessionPage
 from app.ui.stats_page import StatsPage
-from app.ui.styles import app_stylesheet
+from app.ui.styles import app_stylesheet, apply_app_palette
 from daydream_vision import VisionAnalyzer
 from daydream_store import SqliteSessionRecorder
 
@@ -257,7 +257,9 @@ class AppWindow(QMainWindow):
 
 def run_app() -> None:
     app = QApplication([])
+    apply_app_palette(app)
     app.setStyleSheet(app_stylesheet())
     win = AppWindow()
     win.show()
     app.exec()
+

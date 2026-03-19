@@ -22,6 +22,16 @@ from app.core.models import TaskConfig, normalize_lines
 from app.core.whitelist_templates import WhitelistTemplateStore
 
 
+def _form_label(text: str) -> QLabel:
+    label = QLabel(text)
+    label.setObjectName('FormLabel')
+    return label
+
+
+def _ensure_button_text_visible(btn: QPushButton, extra_px: int = 34) -> None:
+    btn.setMinimumWidth(btn.fontMetrics().horizontalAdvance(btn.text()) + extra_px)
+
+
 class HomePage(QWidget):
     start_requested = Signal(TaskConfig)
     stats_requested = Signal()
@@ -44,9 +54,7 @@ class HomePage(QWidget):
         root.addWidget(subtitle)
 
         card = QFrame()
-        card.setStyleSheet(
-            'QFrame { background: rgba(255,255,255,0.45); border: 1px solid rgba(16,42,67,0.10); border-radius: 16px; }'
-        )
+        card.setObjectName('Card')
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(18, 18, 18, 18)
         card_layout.setSpacing(12)
@@ -58,7 +66,7 @@ class HomePage(QWidget):
 
         self.task_name = QLineEdit()
         self.task_name.setPlaceholderText('例如：数学作业 / 论文写作 / 刷题')
-        form.addRow('任务名称', self.task_name)
+        form.addRow(_form_label('任务名称'), self.task_name)
 
         self.start_at = QDateTimeEdit(QDateTime.currentDateTime())
         self.start_at.setCalendarPopup(True)
@@ -66,65 +74,73 @@ class HomePage(QWidget):
         self.end_at.setCalendarPopup(True)
 
         time_row = QHBoxLayout()
+        time_row.setSpacing(10)
         time_row.addWidget(self.start_at)
-        time_row.addWidget(QLabel('→'))
+        arrow = QLabel('→')
+        arrow.setObjectName('InlineLabel')
+        time_row.addWidget(arrow)
         time_row.addWidget(self.end_at)
         time_container = QWidget()
         time_container.setLayout(time_row)
-        form.addRow('起止时间', time_container)
+        form.addRow(_form_label('起止时间'), time_container)
 
         self.distract_after = QSpinBox()
         self.distract_after.setRange(30, 60 * 60)
         self.distract_after.setValue(3 * 60)
         self.distract_after.setSuffix(' 秒（分神累计触发警报）')
-        form.addRow('触发阈值', self.distract_after)
+        form.addRow(_form_label('触发阈值'), self.distract_after)
 
         self.release_after = QSpinBox()
         self.release_after.setRange(10, 60 * 60)
         self.release_after.setValue(2 * 60)
         self.release_after.setSuffix(' 秒（持续工作解除警报）')
-        form.addRow('解除阈值', self.release_after)
+        form.addRow(_form_label('解除阈值'), self.release_after)
 
         self.process_whitelist = QTextEdit()
         self.process_whitelist.setPlaceholderText(
             '允许的进程名（每行一个或用逗号分隔）\n例如：WINWORD.EXE\nchrome.exe\ncode.exe'
         )
         self.process_whitelist.setFixedHeight(88)
-        form.addRow('进程白名单', self.process_whitelist)
+        form.addRow(_form_label('进程白名单'), self.process_whitelist)
 
         self.title_keywords = QTextEdit()
         self.title_keywords.setPlaceholderText('允许的窗口标题关键词（可选）\n例如：作业 / LeetCode / 论文 / Notion')
         self.title_keywords.setFixedHeight(70)
-        form.addRow('标题关键词', self.title_keywords)
+        form.addRow(_form_label('标题关键词'), self.title_keywords)
 
         self.template_select = QComboBox()
         self.apply_template_btn = QPushButton('一键套用')
         self.apply_template_btn.setObjectName('Ghost')
+        _ensure_button_text_visible(self.apply_template_btn)
         self.apply_template_btn.clicked.connect(self._on_apply_template)
 
         tpl_row = QHBoxLayout()
+        tpl_row.setSpacing(10)
         tpl_row.addWidget(self.template_select, 1)
         tpl_row.addWidget(self.apply_template_btn)
         tpl_container = QWidget()
         tpl_container.setLayout(tpl_row)
-        form.addRow('白名单模板', tpl_container)
+        form.addRow(_form_label('白名单模板'), tpl_container)
 
         self.template_name = QLineEdit()
         self.template_name.setPlaceholderText('保存当前白名单为模板：例如 写作 / 刷题 / 英语')
         self.save_template_btn = QPushButton('保存模板')
         self.save_template_btn.setObjectName('Ghost')
+        _ensure_button_text_visible(self.save_template_btn)
         self.save_template_btn.clicked.connect(self._on_save_template)
         self.delete_template_btn = QPushButton('删除模板')
         self.delete_template_btn.setObjectName('Ghost')
+        _ensure_button_text_visible(self.delete_template_btn)
         self.delete_template_btn.clicked.connect(self._on_delete_template)
 
         tpl_manage = QHBoxLayout()
+        tpl_manage.setSpacing(10)
         tpl_manage.addWidget(self.template_name, 1)
         tpl_manage.addWidget(self.save_template_btn)
         tpl_manage.addWidget(self.delete_template_btn)
         tpl_manage_container = QWidget()
         tpl_manage_container.setLayout(tpl_manage)
-        form.addRow('', tpl_manage_container)
+        form.addRow(QLabel(''), tpl_manage_container)
 
         self.enable_camera = QCheckBox('启用摄像头检测（建议开启）')
         self.enable_camera.setChecked(True)
@@ -133,19 +149,22 @@ class HomePage(QWidget):
         self.enable_face = QCheckBox('启用低头/视线粗判（MediaPipe）')
         self.enable_face.setChecked(True)
 
-        form.addRow('检测开关', self.enable_camera)
-        form.addRow('', self.enable_face)
-        form.addRow('', self.enable_yolo)
+        form.addRow(_form_label('检测开关'), self.enable_camera)
+        form.addRow(QLabel(''), self.enable_face)
+        form.addRow(QLabel(''), self.enable_yolo)
 
         card_layout.addLayout(form)
 
         buttons = QHBoxLayout()
+        buttons.setSpacing(10)
         self.stats_btn = QPushButton('查看统计')
         self.stats_btn.setObjectName('Ghost')
+        _ensure_button_text_visible(self.stats_btn)
         self.stats_btn.clicked.connect(self.stats_requested.emit)
         buttons.addWidget(self.stats_btn)
         buttons.addStretch(1)
         self.start_btn = QPushButton('开始任务')
+        _ensure_button_text_visible(self.start_btn)
         buttons.addWidget(self.start_btn)
         card_layout.addLayout(buttons)
 

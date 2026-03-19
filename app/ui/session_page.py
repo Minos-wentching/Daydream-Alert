@@ -17,12 +17,16 @@ from PySide6.QtWidgets import (
 from app.core.models import FocusState, StateUpdate, TaskConfig
 
 
+def _ensure_button_text_visible(btn: QPushButton, extra_px: int = 34) -> None:
+    btn.setMinimumWidth(btn.fontMetrics().horizontalAdvance(btn.text()) + extra_px)
+
+
 class SessionPage(QWidget):
     exit_requested = Signal()
 
     def __init__(self):
         super().__init__()
-        self.setObjectName("Root")
+        self.setObjectName('Root')
 
         self._config: TaskConfig | None = None
         self._started_at: datetime | None = None
@@ -32,18 +36,19 @@ class SessionPage(QWidget):
         root.setSpacing(14)
 
         header = QHBoxLayout()
-        self.title = QLabel("任务进行中")
-        self.title.setObjectName("Title")
-        self.subtitle = QLabel("")
-        self.subtitle.setObjectName("SubTitle")
+        self.title = QLabel('任务进行中')
+        self.title.setObjectName('Title')
+        self.subtitle = QLabel('')
+        self.subtitle.setObjectName('SubTitle')
         header_left = QVBoxLayout()
         header_left.addWidget(self.title)
         header_left.addWidget(self.subtitle)
         header.addLayout(header_left)
         header.addStretch(1)
 
-        self.exit_btn = QPushButton("退出到首页")
-        self.exit_btn.setObjectName("Ghost")
+        self.exit_btn = QPushButton('退出到首页')
+        self.exit_btn.setObjectName('Ghost')
+        _ensure_button_text_visible(self.exit_btn)
         self.exit_btn.setVisible(False)
         self.exit_btn.clicked.connect(self.exit_requested.emit)
         header.addWidget(self.exit_btn)
@@ -51,20 +56,18 @@ class SessionPage(QWidget):
         root.addLayout(header)
 
         card = QFrame()
-        card.setStyleSheet(
-            "QFrame { background: rgba(255,255,255,0.45); border: 1px solid rgba(16,42,67,0.10); border-radius: 16px; }"
-        )
+        card.setObjectName('Card')
         card_layout = QGridLayout(card)
         card_layout.setContentsMargins(18, 18, 18, 18)
         card_layout.setHorizontalSpacing(16)
         card_layout.setVerticalSpacing(10)
 
-        self.state_label = QLabel("状态：-")
-        self.state_label.setStyleSheet("font-size: 18px; font-weight: 700;")
-        self.distracted_label = QLabel("累计分神：0s")
-        self.work_streak_label = QLabel("持续工作：0s")
-        self.window_label = QLabel("前台窗口：-")
-        self.reasons_label = QLabel("原因：-")
+        self.state_label = QLabel('状态：-')
+        self.state_label.setStyleSheet('font-size: 18px; font-weight: 700;')
+        self.distracted_label = QLabel('累计分神：0s')
+        self.work_streak_label = QLabel('持续工作：0s')
+        self.window_label = QLabel('前台窗口：-')
+        self.reasons_label = QLabel('原因：-')
 
         left = QVBoxLayout()
         left.addWidget(self.state_label)
@@ -78,12 +81,10 @@ class SessionPage(QWidget):
         left_container.setLayout(left)
 
         self.preview = QLabel()
+        self.preview.setObjectName('PreviewBox')
         self.preview.setFixedSize(460, 300)
-        self.preview.setStyleSheet(
-            "background: rgba(255,255,255,0.55); border: 1px solid rgba(16,42,67,0.15); border-radius: 12px;"
-        )
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview.setText("摄像头预览")
+        self.preview.setText('摄像头预览')
 
         card_layout.addWidget(left_container, 0, 0, 1, 1)
         card_layout.addWidget(self.preview, 0, 1, 1, 1, alignment=Qt.AlignmentFlag.AlignRight)
@@ -97,7 +98,7 @@ class SessionPage(QWidget):
 
     def set_config(self, config: TaskConfig) -> None:
         self._config = config
-        self.title.setText(f"任务：{config.task_name}")
+        self.title.setText(f'任务：{config.task_name}')
         self.subtitle.setText(
             f"{config.start_at.strftime('%Y-%m-%d %H:%M')} → {config.end_at.strftime('%Y-%m-%d %H:%M')}"
         )
@@ -134,21 +135,20 @@ class SessionPage(QWidget):
 
     def on_state_update(self, update: StateUpdate) -> None:
         state_text = {
-            FocusState.WORK: "工作",
-            FocusState.DISTRACTED: "分神",
-            FocusState.REST: "休息",
-        }.get(update.observed_state, "-")
-        alarm_text = "（警报中）" if update.alarm_on else ""
-        self.state_label.setText(f"状态：{state_text}{alarm_text}")
-        self.distracted_label.setText(f"累计分神：{int(update.distracted_accumulated_s)}s")
-        self.work_streak_label.setText(f"持续工作：{int(update.work_streak_s)}s")
+            FocusState.WORK: '工作',
+            FocusState.DISTRACTED: '分神',
+            FocusState.REST: '休息',
+        }.get(update.observed_state, '-')
+        alarm_text = '（警报中）' if update.alarm_on else ''
+        self.state_label.setText(f'状态：{state_text}{alarm_text}')
+        self.distracted_label.setText(f'累计分神：{int(update.distracted_accumulated_s)}s')
+        self.work_streak_label.setText(f'持续工作：{int(update.work_streak_s)}s')
 
         if update.active_window is not None:
             self.window_label.setText(
-                f"前台窗口：{update.active_window.process_name} | {update.active_window.window_title}"
+                f'前台窗口：{update.active_window.process_name} | {update.active_window.window_title}'
             )
         else:
-            self.window_label.setText("前台窗口：-")
+            self.window_label.setText('前台窗口：-')
 
-        self.reasons_label.setText("原因：" + (", ".join(update.reasons) if update.reasons else "-"))
-
+        self.reasons_label.setText('原因：' + (', '.join(update.reasons) if update.reasons else '-'))

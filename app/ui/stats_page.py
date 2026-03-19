@@ -22,6 +22,16 @@ from PySide6.QtWidgets import (
 from app.core.focus_stats import load_period_stats
 
 
+def _ensure_button_text_visible(btn: QPushButton, extra_px: int = 34) -> None:
+    btn.setMinimumWidth(btn.fontMetrics().horizontalAdvance(btn.text()) + extra_px)
+
+
+def _inline_label(text: str) -> QLabel:
+    label = QLabel(text)
+    label.setObjectName('InlineLabel')
+    return label
+
+
 def _local_tz():
     return datetime.now().astimezone().tzinfo
 
@@ -72,20 +82,20 @@ class StatsPage(QWidget):
 
         self.back_btn = QPushButton('返回首页')
         self.back_btn.setObjectName('Ghost')
+        _ensure_button_text_visible(self.back_btn)
         self.back_btn.clicked.connect(self.back_requested.emit)
         header.addWidget(self.back_btn)
         root.addLayout(header)
 
         card = QFrame()
-        card.setStyleSheet(
-            'QFrame { background: rgba(255,255,255,0.45); border: 1px solid rgba(16,42,67,0.10); border-radius: 16px; }'
-        )
+        card.setObjectName('Card')
         card_layout = QGridLayout(card)
         card_layout.setContentsMargins(18, 18, 18, 18)
         card_layout.setHorizontalSpacing(16)
         card_layout.setVerticalSpacing(10)
 
         self.mode = QComboBox()
+        self.mode.setObjectName('KeepLight')
         self.mode.addItems(['日报', '周报'])
         self.mode.currentIndexChanged.connect(self.refresh)
 
@@ -94,13 +104,15 @@ class StatsPage(QWidget):
         self.pick_date.dateChanged.connect(self.refresh)
 
         self.refresh_btn = QPushButton('刷新')
+        _ensure_button_text_visible(self.refresh_btn)
         self.refresh_btn.clicked.connect(self.refresh)
 
         ctrl = QHBoxLayout()
-        ctrl.addWidget(QLabel('视图'))
+        ctrl.setSpacing(10)
+        ctrl.addWidget(_inline_label('视图'))
         ctrl.addWidget(self.mode)
         ctrl.addSpacing(10)
-        ctrl.addWidget(QLabel('日期'))
+        ctrl.addWidget(_inline_label('日期'))
         ctrl.addWidget(self.pick_date)
         ctrl.addStretch(1)
         ctrl.addWidget(self.refresh_btn)

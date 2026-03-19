@@ -13,7 +13,7 @@ from app.io.video_source import LocalWebcamSource
 from app.ui.alarm_overlay import AlarmOverlay
 from app.ui.home_page import HomePage
 from app.ui.session_page import SessionPage
-from app.ui.styles import app_stylesheet
+from app.ui.styles import app_stylesheet, apply_app_palette
 from app.vision.analyzer import VisionAnalyzer
 
 
@@ -205,8 +205,10 @@ class AppWindow(QMainWindow):
 
 def run_app() -> None:
     app = QApplication([])
+    apply_app_palette(app)
     app.setStyleSheet(app_stylesheet())
     win = AppWindow()
     win.show()
     app.exec()
+
 
