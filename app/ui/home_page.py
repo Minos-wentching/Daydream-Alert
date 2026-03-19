@@ -487,9 +487,7 @@ class HomePage(QWidget):
                 if bool(torch.cuda.is_available()):
                     box = QMessageBox(self)
                     box.setWindowTitle('YOLO 运行设备')
-                    box.setText('检测到可用 GPU（CUDA）。是否使用 GPU 运行 YOLOv8 手机检测？
-
-（推荐使用 GPU；若后续报 CUDA 错误可选 CPU。）')
+                    box.setText('检测到可用 GPU（CUDA）。是否使用 GPU 运行 YOLOv8 手机检测？\\n\\n（推荐使用 GPU；若后续报 CUDA 错误可选 CPU。）')
                     yes_btn = box.addButton('使用 GPU', QMessageBox.ButtonRole.AcceptRole)
                     no_btn = box.addButton('使用 CPU', QMessageBox.ButtonRole.RejectRole)
                     box.setDefaultButton(yes_btn)
@@ -520,4 +518,5 @@ class HomePage(QWidget):
         )
 
         self.start_requested.emit(config)
+
 
