@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
@@ -45,14 +45,6 @@ class SessionPage(QWidget):
         header_left.addWidget(self.subtitle)
         header.addLayout(header_left)
         header.addStretch(1)
-
-        self.exit_btn = QPushButton('退出到首页')
-        self.exit_btn.setObjectName('Ghost')
-        _ensure_button_text_visible(self.exit_btn)
-        self.exit_btn.setVisible(False)
-        self.exit_btn.clicked.connect(self.exit_requested.emit)
-        header.addWidget(self.exit_btn)
-
         root.addLayout(header)
 
         card = QFrame()
@@ -90,11 +82,15 @@ class SessionPage(QWidget):
         card_layout.addWidget(self.preview, 0, 1, 1, 1, alignment=Qt.AlignmentFlag.AlignRight)
 
         root.addWidget(card)
-        root.addStretch(1)
 
-        self._exit_timer = QTimer(self)
-        self._exit_timer.setInterval(500)
-        self._exit_timer.timeout.connect(self._refresh_exit_visibility)
+        footer = QHBoxLayout()
+        self.exit_btn = QPushButton('退出')
+        self.exit_btn.setObjectName('Ghost')
+        _ensure_button_text_visible(self.exit_btn)
+        self.exit_btn.clicked.connect(self.exit_requested.emit)
+        footer.addWidget(self.exit_btn)
+        footer.addStretch(1)
+        root.addLayout(footer)
 
     def set_config(self, config: TaskConfig) -> None:
         self._config = config
@@ -103,18 +99,9 @@ class SessionPage(QWidget):
             f"{config.start_at.strftime('%Y-%m-%d %H:%M')} → {config.end_at.strftime('%Y-%m-%d %H:%M')}"
         )
         self._started_at = None
-        self.exit_btn.setVisible(False)
-        self._exit_timer.start()
 
     def mark_started(self, started_at: datetime) -> None:
         self._started_at = started_at
-
-    def _refresh_exit_visibility(self) -> None:
-        if self._config is None or self._started_at is None:
-            self.exit_btn.setVisible(False)
-            return
-        elapsed = (datetime.now().astimezone() - self._started_at).total_seconds()
-        self.exit_btn.setVisible(elapsed >= self._config.exit_button_after_s)
 
     def set_preview_frame(self, frame_bgr) -> None:
         try:
@@ -124,7 +111,8 @@ class SessionPage(QWidget):
 
         h, w, _ = frame_bgr.shape
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        qimg = QImage(rgb.data, w, h, QImage.Format.Format_RGB888)
+        bytes_per_line = int(rgb.strides[0])
+        qimg = QImage(rgb.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
         pix = QPixmap.fromImage(qimg).scaled(
             self.preview.width(),
             self.preview.height(),

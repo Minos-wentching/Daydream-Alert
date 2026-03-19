@@ -6,17 +6,18 @@ from enum import Enum
 from typing import Iterable, List, Optional
 
 from pydantic import BaseModel, Field
+from pydantic import field_validator
 
 
 class FocusState(str, Enum):
-    WORK = "work"
-    DISTRACTED = "distracted"
-    REST = "rest"
+    WORK = 'work'
+    DISTRACTED = 'distracted'
+    REST = 'rest'
 
 
 class ActiveWindowInfo(BaseModel):
-    process_name: str = ""
-    window_title: str = ""
+    process_name: str = ''
+    window_title: str = ''
     pid: Optional[int] = None
 
 
@@ -37,15 +38,31 @@ class TaskConfig(BaseModel):
     enable_yolo_phone: bool = True
     enable_face_pose: bool = True
 
-    def normalized(self) -> "TaskConfig":
+    @staticmethod
+    def _local_tz():
+        return datetime.now().astimezone().tzinfo
+
+    @classmethod
+    def _ensure_local_tz(cls, value: datetime) -> datetime:
+        tz = cls._local_tz()
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=tz)
+        return value.astimezone(tz)
+
+    @field_validator('start_at', 'end_at')
+    @classmethod
+    def _normalize_datetime_tz(cls, value: datetime) -> datetime:
+        return cls._ensure_local_tz(value)
+
+    def normalized(self) -> 'TaskConfig':
         normalized_processes = sorted(
             {p.strip().lower() for p in self.allowed_process_names if p.strip()}
         )
         normalized_keywords = sorted({k.strip() for k in self.allowed_title_keywords if k.strip()})
         return self.model_copy(
             update={
-                "allowed_process_names": normalized_processes,
-                "allowed_title_keywords": normalized_keywords,
+                'allowed_process_names': normalized_processes,
+                'allowed_title_keywords': normalized_keywords,
             }
         )
 
@@ -73,9 +90,8 @@ def normalize_lines(values: Iterable[str]) -> List[str]:
     for value in values:
         if not value:
             continue
-        for part in value.replace(",", "\n").splitlines():
+        for part in value.replace(',', '\n').splitlines():
             part = part.strip()
             if part:
                 out.append(part)
     return out
-

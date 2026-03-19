@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from PySide6.QtCore import QObject, QMetaObject, QThread, QTimer, Qt, Signal, Slot
-from PySide6.QtWidgets import QApplication, QMainWindow, QStackedWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QStackedWidget
 
 from pathlib import Path
 
@@ -13,6 +13,7 @@ from app.core.session_logger import SessionLogger
 from app.io.active_window import WindowsActiveWindowProvider
 from app.io.video_source import LocalWebcamSource
 from app.ui.alarm_overlay import AlarmOverlay
+from app.ui.surrender_overlay import SurrenderOverlay
 from app.ui.home_page import HomePage
 from app.ui.session_page import SessionPage
 from app.ui.stats_page import StatsPage
@@ -79,13 +80,20 @@ class _Worker(QObject):
             self._db = None
             self.failed.emit(f"SQLite 记录初始化失败：{exc}")
 
+        effective_config = self._config
+
         if self._config.enable_camera:
             try:
                 self._video = LocalWebcamSource(0)
                 self._video.open()
             except Exception as exc:
                 self._video = None
-                self.failed.emit(f"摄像头打开失败：{exc}")
+                self.failed.emit(f"摄像头打开失败：{exc}（已切换为仅窗口检测模式）")
+                effective_config = self._config.model_copy(
+                    update={"enable_camera": False, "enable_yolo_phone": False, "enable_face_pose": False}
+                )
+
+        self._config = effective_config
 
         def _on_update(update):
             if self._logger is not None:
@@ -160,9 +168,11 @@ class AppWindow(QMainWindow):
 
         self._overlay = AlarmOverlay()
 
+        self._surrender = SurrenderOverlay()
+
         self._home.start_requested.connect(self._start_session)
         self._home.stats_requested.connect(self._show_stats)
-        self._session.exit_requested.connect(self._stop_and_back_home)
+        self._session.exit_requested.connect(self._confirm_exit)
         self._stats.back_requested.connect(self._back_home)
 
         self._worker_thread: QThread | None = None
@@ -224,13 +234,29 @@ class AppWindow(QMainWindow):
         else:
             self._overlay.hide_overlay()
 
-    def _stop_and_back_home(self) -> None:
+    def _confirm_exit(self) -> None:
+        box = QMessageBox(self)
+        box.setWindowTitle('退出？')
+        box.setText('确定要中道崩殂嘛bro？')
+        yes_btn = box.addButton('yes', QMessageBox.ButtonRole.YesRole)
+        no_btn = box.addButton('no', QMessageBox.ButtonRole.NoRole)
+        box.setDefaultButton(no_btn)
+        box.exec()
+
+        if box.clickedButton() == yes_btn:
+            self._surrender_and_back_home()
+
+    def _stop_session(self) -> None:
         self._schedule_timer.stop()
         self._overlay.hide_overlay()
+        try:
+            self._surrender.hide_overlay()
+        except Exception:
+            pass
 
         if self._worker is not None:
             try:
-                QMetaObject.invokeMethod(self._worker, "stop", Qt.ConnectionType.QueuedConnection)
+                QMetaObject.invokeMethod(self._worker, 'stop', Qt.ConnectionType.QueuedConnection)
             except Exception:
                 pass
 
@@ -242,6 +268,16 @@ class AppWindow(QMainWindow):
         self._worker = None
         self._config = None
         self._started_at = None
+
+    def _surrender_and_back_home(self) -> None:
+        self._stop_session()
+        self._surrender.show_for(5000, on_finished=self._back_home_after_surrender)
+
+    def _back_home_after_surrender(self) -> None:
+        self._stack.setCurrentWidget(self._home)
+
+    def _stop_and_back_home(self) -> None:
+        self._stop_session()
         self._stack.setCurrentWidget(self._home)
 
     def _show_stats(self) -> None:
@@ -262,4 +298,6 @@ def run_app() -> None:
     win = AppWindow()
     win.show()
     app.exec()
+
+
 

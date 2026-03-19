@@ -57,24 +57,38 @@ class MonitorController:
             allowed_title_keywords=self._config.allowed_title_keywords,
         )
         if not allowed:
-            reasons.append("active_window_not_allowed")
+            reasons.append('active_window_not_allowed')
 
+        # Vision is best-effort:
+        # - If camera is disabled, ignore vision completely.
+        # - If face pose is disabled/unavailable, do not force REST due to face_present=False.
+        # - If frame/analyzer is missing, continue with window-only signals.
         signals = VisionSignals()
+
+        if self._config.enable_camera:
+            if not self._config.enable_face_pose:
+                signals.face_present = True
+            elif frame_bgr is None or self._vision_analyzer is None:
+                signals.face_present = True
+                if frame_bgr is None:
+                    reasons.append('camera_no_frame')
+
         if frame_bgr is not None and self._vision_analyzer is not None:
             try:
                 signals = self._vision_analyzer.analyze(frame_bgr)
             except Exception:
-                signals = VisionSignals()
+                signals = VisionSignals(face_present=True)
+                reasons.append('vision_error')
 
         if self._config.enable_camera:
             if self._config.enable_yolo_phone and signals.phone_present:
-                reasons.append("phone_detected")
+                reasons.append('phone_detected')
             if self._config.enable_face_pose and signals.looking_down:
-                reasons.append("looking_down")
+                reasons.append('looking_down')
 
-        if self._config.enable_camera and not signals.face_present:
+        if self._config.enable_camera and self._config.enable_face_pose and not signals.face_present:
             observed = FocusState.REST
-            reasons.append("no_face")
+            reasons.append('no_face')
         else:
             observed = FocusState.DISTRACTED if reasons else FocusState.WORK
 
@@ -88,4 +102,3 @@ class MonitorController:
         )
         self._on_update(update)
         return update
-

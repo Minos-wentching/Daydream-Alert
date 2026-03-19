@@ -191,6 +191,72 @@ def app_stylesheet() -> str:
     QHeaderView::section:hover {
         background: rgba(0,0,0,0.55);
     }
+
+    QScrollArea {
+        background: transparent;
+    }
+
+    QScrollArea > QWidget > QWidget {
+        background: transparent;
+    }
+
+    QFrame#CollapsibleSection {
+        background: transparent;
+        border: 0;
+    }
+
+    QToolButton#SectionHeader {
+        background: rgba(0,0,0,0.55);
+        color: #FFFFFF;
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 15px;
+        font-weight: 700;
+        text-align: left;
+    }
+
+    QToolButton#SectionHeader:hover {
+        background: rgba(0,0,0,0.42);
+        border: 1px solid rgba(255,255,255,0.22);
+    }
+
+    QListWidget {
+        background: rgba(0,0,0,0.60);
+        color: #FFFFFF;
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 12px;
+        padding: 6px;
+        outline: 0;
+    }
+
+    QListWidget::item {
+        padding: 8px 10px;
+        border-radius: 10px;
+    }
+
+    QListWidget::item:selected {
+        background: rgba(255,255,255,0.16);
+    }
+
+    QSlider::groove:horizontal {
+        border: 1px solid rgba(255,255,255,0.14);
+        height: 8px;
+        background: rgba(0,0,0,0.45);
+        border-radius: 4px;
+    }
+
+    QSlider::handle:horizontal {
+        background: rgba(255,255,255,0.80);
+        border: 1px solid rgba(255,255,255,0.30);
+        width: 18px;
+        margin: -6px 0;
+        border-radius: 9px;
+    }
+
+    QSlider::handle:horizontal:hover {
+        background: rgba(255,255,255,0.92);
+    }
     """
 
 
