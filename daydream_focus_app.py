@@ -18,6 +18,7 @@ from app.core.models import TaskConfig
 from app.core.monitor_controller import MonitorController
 from app.core.session_logger import SessionLogger
 from app.io.active_window import WindowsActiveWindowProvider
+from app.io.process_terminator import WindowsProcessTerminator
 from app.io.video_source import LocalWebcamSource
 from app.ui.alarm_overlay import AlarmOverlay
 from app.ui.home_page import HomePage
@@ -51,6 +52,7 @@ class _Worker(QObject):
         self._video = None
         self._vision = None
         self._active_window = None
+        self._process_terminator = None
         self._monitor = None
         self._logger = None
         self._db = None
@@ -65,6 +67,11 @@ class _Worker(QObject):
             self._active_window = WindowsActiveWindowProvider()
         except Exception:
             self._active_window = _NullActiveWindowProvider()
+
+        try:
+            self._process_terminator = WindowsProcessTerminator()
+        except Exception:
+            self._process_terminator = None
 
         enable_yolo = self._config.enable_yolo_phone and self._config.enable_camera
         if enable_yolo and not Path('yolov8n.pt').exists():
@@ -117,6 +124,7 @@ class _Worker(QObject):
             active_window_provider=self._active_window,
             vision_analyzer=self._vision if self._config.enable_camera else None,
             on_update=_on_update,
+            process_terminator=self._process_terminator,
         )
 
         # Make the UI update immediately.

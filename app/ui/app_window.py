@@ -9,6 +9,7 @@ from app.core.monitor_controller import MonitorController
 from app.core.session_logger import SessionLogger
 from app.core.models import TaskConfig
 from app.io.active_window import WindowsActiveWindowProvider
+from app.io.process_terminator import WindowsProcessTerminator
 from app.io.video_source import LocalWebcamSource
 from app.ui.alarm_overlay import AlarmOverlay
 from app.ui.home_page import HomePage
@@ -40,6 +41,7 @@ class _Worker(QObject):
         self._video = None
         self._vision = None
         self._active_window = None
+        self._process_terminator = None
         self._monitor = None
         self._logger = None
 
@@ -48,6 +50,12 @@ class _Worker(QObject):
             self._active_window = WindowsActiveWindowProvider()
         except Exception:
             self._active_window = _NullActiveWindowProvider()
+
+
+        try:
+            self._process_terminator = WindowsProcessTerminator()
+        except Exception:
+            self._process_terminator = None
 
         self._vision = VisionAnalyzer(
             enable_face_pose=self._config.enable_face_pose and self._config.enable_camera,
@@ -69,6 +77,7 @@ class _Worker(QObject):
             active_window_provider=self._active_window,
             vision_analyzer=self._vision if self._config.enable_camera else None,
             on_update=self._logger.on_update,
+            process_terminator=self._process_terminator,
         )
 
         self._timer.start()
