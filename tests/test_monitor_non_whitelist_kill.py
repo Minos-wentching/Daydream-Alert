@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from app.core.models import ActiveWindowInfo, TaskConfig
+from app.core.models import ActiveWindowInfo, FocusState, TaskConfig
 from app.core.monitor_controller import MonitorController
 
 
@@ -22,11 +22,31 @@ class _Terminator:
         return self.ok
 
 
+class _Vision:
+    def __init__(self, *, face_present: bool):
+        self._face_present = face_present
+
+    def analyze(self, _frame):
+        return type(
+            'Signals',
+            (),
+            {'face_present': self._face_present, 'looking_down': False, 'phone_present': False},
+        )()
+
+
 def _ts(seconds: int) -> datetime:
     return datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc) + timedelta(seconds=seconds)
 
 
-def _config(*, threshold_s: int, allowed_process_names: list[str], allowed_title_keywords: list[str] | None = None):
+def _config(
+    *,
+    threshold_s: int,
+    allowed_process_names: list[str],
+    allowed_title_keywords: list[str] | None = None,
+    enable_camera: bool = False,
+    enable_yolo_phone: bool = False,
+    enable_face_pose: bool = False,
+):
     allowed_title_keywords = allowed_title_keywords or []
     return TaskConfig(
         task_name='t',
@@ -36,9 +56,9 @@ def _config(*, threshold_s: int, allowed_process_names: list[str], allowed_title
         release_alarm_after_work_s=120,
         allowed_process_names=allowed_process_names,
         allowed_title_keywords=allowed_title_keywords,
-        enable_camera=False,
-        enable_yolo_phone=False,
-        enable_face_pose=False,
+        enable_camera=enable_camera,
+        enable_yolo_phone=enable_yolo_phone,
+        enable_face_pose=enable_face_pose,
     )
 
 
@@ -113,3 +133,56 @@ def test_title_mismatch_does_not_kill_process_in_process_whitelist():
 
     assert u.alarm_on is True
     assert terminator.calls == []
+
+
+def test_no_face_non_whitelist_is_distracted_and_triggers_alarm():
+    provider = _Provider()
+    terminator = _Terminator(ok=True)
+
+    cfg = _config(
+        threshold_s=10,
+        allowed_process_names=['good.exe'],
+        enable_camera=True,
+        enable_face_pose=True,
+        enable_yolo_phone=False,
+    )
+    mc = MonitorController(
+        config=cfg,
+        active_window_provider=provider,
+        vision_analyzer=_Vision(face_present=False),
+        on_update=lambda _u: None,
+        process_terminator=terminator,
+    )
+
+    provider.active_window = ActiveWindowInfo(process_name='bad.exe', window_title='Bad', pid=111)
+    mc.tick(frame_bgr=object(), now=_ts(0))
+    u = mc.tick(frame_bgr=object(), now=_ts(10))
+
+    assert u.observed_state == FocusState.DISTRACTED
+    assert u.alarm_on is True
+    assert terminator.calls == [111]
+
+
+def test_no_face_allowed_window_stays_rest():
+    provider = _Provider()
+
+    cfg = _config(
+        threshold_s=10,
+        allowed_process_names=['good.exe'],
+        enable_camera=True,
+        enable_face_pose=True,
+        enable_yolo_phone=False,
+    )
+    mc = MonitorController(
+        config=cfg,
+        active_window_provider=provider,
+        vision_analyzer=_Vision(face_present=False),
+        on_update=lambda _u: None,
+        process_terminator=None,
+    )
+
+    provider.active_window = ActiveWindowInfo(process_name='good.exe', window_title='Good', pid=222)
+    u = mc.tick(frame_bgr=object(), now=_ts(0))
+
+    assert u.observed_state == FocusState.REST
+

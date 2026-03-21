@@ -25,8 +25,15 @@ class VisionAnalyzer:
         self._yolo_weights_path = yolo_weights_path
 
         self._face_mesh = None
+        self._face_detection = None
         self._yolo = None
         self._yolo_device = 'cpu'
+
+        try:
+            thr_raw = (os.environ.get('DAYDREAM_LOOKING_DOWN_THRESHOLD') or '0.10').strip()
+            self._looking_down_threshold = max(0.04, min(0.30, float(thr_raw)))
+        except Exception:
+            self._looking_down_threshold = 0.10
 
         # Throttle YOLO inference to keep UI responsive on CPU.
         # - DAYDREAM_YOLO_STRIDE=5 means run YOLO once every 5 calls to analyze().
@@ -49,17 +56,30 @@ class VisionAnalyzer:
         if self._enable_face_pose:
             try:
                 import mediapipe as mp  # type: ignore
-
-                face_mesh = mp.solutions.face_mesh
-                self._face_mesh = face_mesh.FaceMesh(
-                    static_image_mode=False,
-                    max_num_faces=1,
-                    refine_landmarks=True,
-                    min_detection_confidence=0.5,
-                    min_tracking_confidence=0.5,
-                )
             except Exception:
-                self._face_mesh = None
+                mp = None
+
+            if mp is not None:
+                try:
+                    face_mesh = mp.solutions.face_mesh
+                    self._face_mesh = face_mesh.FaceMesh(
+                        static_image_mode=False,
+                        max_num_faces=1,
+                        refine_landmarks=True,
+                        min_detection_confidence=0.5,
+                        min_tracking_confidence=0.5,
+                    )
+                except Exception:
+                    self._face_mesh = None
+
+                try:
+                    face_detection = mp.solutions.face_detection
+                    self._face_detection = face_detection.FaceDetection(
+                        model_selection=0,
+                        min_detection_confidence=0.5,
+                    )
+                except Exception:
+                    self._face_detection = None
 
         if self._enable_yolo_phone:
             try:
@@ -89,11 +109,17 @@ class VisionAnalyzer:
         looking_down = False
         phone_present = False
 
-        if self._face_mesh is not None:
+        frame_rgb = None
+        if self._face_mesh is not None or self._face_detection is not None:
             try:
                 import cv2  # type: ignore
 
                 frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            except Exception:
+                frame_rgb = None
+
+        if self._face_mesh is not None and frame_rgb is not None:
+            try:
                 result = self._face_mesh.process(frame_rgb)
                 if result.multi_face_landmarks:
                     face_present = True
@@ -102,8 +128,16 @@ class VisionAnalyzer:
                     right_eye = landmarks[263]
                     nose_tip = landmarks[1]
                     eye_y = (left_eye.y + right_eye.y) / 2.0
-                    if (nose_tip.y - eye_y) > 0.12:
+                    if (nose_tip.y - eye_y) > self._looking_down_threshold:
                         looking_down = True
+            except Exception:
+                pass
+
+        if (not face_present) and self._face_detection is not None and frame_rgb is not None:
+            try:
+                det = self._face_detection.process(frame_rgb)
+                if getattr(det, 'detections', None):
+                    face_present = True
             except Exception:
                 pass
 

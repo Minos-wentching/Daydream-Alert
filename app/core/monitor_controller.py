@@ -139,9 +139,15 @@ class MonitorController:
             if self._config.enable_face_pose and signals.looking_down:
                 reasons.append('looking_down')
 
-        if self._config.enable_camera and self._config.enable_face_pose and not signals.face_present:
-            observed = FocusState.REST
+        no_face = self._config.enable_camera and self._config.enable_face_pose and (not signals.face_present)
+        if no_face:
             reasons.append('no_face')
+            # If the foreground app is already considered "not allowed", treat it as DISTRACTED even if
+            # the camera fails to track a face (common when looking down / lighting issues).
+            if (not allowed) or (self._config.enable_yolo_phone and signals.phone_present):
+                observed = FocusState.DISTRACTED
+            else:
+                observed = FocusState.REST
         else:
             observed = FocusState.DISTRACTED if reasons else FocusState.WORK
 
